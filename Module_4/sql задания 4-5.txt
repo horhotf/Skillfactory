@@ -1,0 +1,339 @@
+/*
+4.1
+База данных содержит список аэропортов практически всех крупных городов России. 
+В большинстве городов есть только один аэропорт. Исключение составляет:
+*/
+select
+    a.city, 
+    count(a.airport_code)
+from 
+    dst_project.airports a
+group by 
+    a.city
+having 
+    count(a.airport_code) > 1
+
+--Ответ: Moscow, Ulyanovsk
+
+/*	
+4.2.1
+Таблица рейсов содержит всю информацию о прошлых, текущих и запланированных рейсах. 
+Сколько всего статусов для рейсов определено в таблице?
+*/
+select
+    count(distinct(f.status))
+from 
+    dst_project.flights f
+
+--Ответ: 6
+
+/*	
+4.2.2
+Какое количество самолетов находятся в воздухе на момент среза в базе 
+(статус рейса «самолёт уже вылетел и находится в воздухе»).
+*/
+select
+    count(flight_id)
+from 
+    dst_project.flights f
+where
+    f.status = 'Departed'
+	
+--Ответ:58
+
+/*
+4.2.3
+Места определяют схему салона каждой модели. 
+Сколько мест имеет самолет модели  (Boeing 777-300)?
+*/
+select
+    count(seat_no)
+from 
+    dst_project.seats s
+where 
+    s.aircraft_code = '773'
+    
+--Ответ: 402
+
+/*
+4.2.4
+Сколько состоявшихся (фактических) рейсов было совершено между 
+1 апреля 2017 года и 1 сентября 2017 года?
+*/
+select
+    count(flight_id)
+from 
+    dst_project.flights f
+where
+    f.actual_arrival > '04-01-2017' 
+    and f.actual_arrival <'09-02-2017' 
+    and not f.status = 'Cancelled'
+
+--Ответ: 74227
+
+/*
+4.3.1
+Сколько всего рейсов было отменено по данным базы?
+*/
+select
+    count(flight_id)
+from 
+    dst_project.flights f
+where
+    f.status = 'Cancelled'
+
+--Ответ: 437
+
+/*
+4.3.2
+Сколько самолетов моделей типа Boeing, Sukhoi Superjet, Airbus находится в базе авиаперевозок?
+*/
+select
+    count(a.model)
+from 
+    dst_project.aircrafts a
+where a.model like 'Boeing%'
+
+select
+    count(a.model)
+from 
+    dst_project.aircrafts a
+where a.model like 'Su%'
+
+select
+    count(a.model)
+from 
+    dst_project.aircrafts a
+where a.model like 'Airbus%'
+
+
+--Ответ: Boeing - 3, Sukhoi Superjet - 1, Airbus - 3
+
+/*
+4.3.3
+В какой части (частях) света находится больше аэропортов?
+*/
+select a.asia asia, e.eu europe, a.asia + e.eu aseu
+from
+    (
+    select
+        count(a.airport_code) asia
+    from 
+        dst_project.airports a
+    where a.timezone like 'Asia%'
+    ) a,
+    (
+    select
+        count(a.airport_code) eu
+    from 
+        dst_project.airports a
+    where a.timezone like 'Europe%'
+    ) e
+
+--Ответ: Europe, Asia
+
+/*
+4.3.4
+У какого рейса была самая большая задержка прибытия за все время сбора данных? 
+Введите id рейса (flight_id).
+*/
+select
+    flight_id, actual_arrival - scheduled_arrival delta
+from 
+    dst_project.flights f
+where
+   actual_arrival - scheduled_arrival is not null
+order by delta desc
+
+--Ответ: 157571
+
+/*
+4.4.1
+Когда был запланирован самый первый вылет, сохраненный в базе данных?
+*/
+select
+    scheduled_departure
+from 
+    dst_project.flights f
+order by 
+    scheduled_departure asc
+limit 1
+
+--Ответ: 14.08.2016 
+
+/*
+4.4.2
+Сколько минут составляет запланированное время полета в самом длительном рейсе?
+*/
+select
+    scheduled_arrival - scheduled_departure delta
+from 
+    dst_project.flights f
+order by delta desc
+limit 1
+
+--Ответ: 530
+
+/*
+4.4.3
+Между какими аэропортами пролегает самый длительный по времени запланированный рейс?
+*/
+select
+    departure_airport, arrival_airport, scheduled_arrival - scheduled_departure delta
+from 
+    dst_project.flights f
+order by delta desc
+limit 1
+
+--Ответ: DME - UUS
+
+/*
+4.4.4
+Сколько составляет средняя дальность полета среди всех самолетов в минутах? 
+Секунды округляются в меньшую сторону (отбрасываются до минут).
+*/
+select
+    avg(scheduled_arrival - scheduled_departure) delta
+from 
+    dst_project.flights f
+
+--Ответ: 128
+
+/*
+4.5.1
+Мест какого класса у SU9 больше всего?
+*/
+select
+    fare_conditions, count(seat_no)
+from 
+    dst_project.seats s
+where 
+    aircraft_code = 'SU9'
+group by 
+    fare_conditions
+order by count(seat_no) desc
+limit 1
+
+--Ответ: Economy  
+
+/*
+4.5.2
+Какую самую минимальную стоимость составило бронирование за всю историю?
+*/
+select
+    b.total_amount
+from 
+    dst_project.bookings b
+order by b.total_amount asc
+limit 1
+
+--Ответ: 3400
+
+/*
+4.5.3
+Какой номер места был у пассажира с id = 4313 788533?
+*/
+select
+    bp.seat_no
+from 
+    dst_project.tickets t
+left join 
+    dst_project.boarding_passes bp on bp.ticket_no = t.ticket_no
+where passenger_id = '4313 788533'
+
+--Ответ: 2A
+
+/*
+5.1.1
+Анапа — курортный город на юге России. Сколько рейсов прибыло в Анапу за 2017 год?
+*/
+select
+    count(f.flight_id)
+from 
+    dst_project.flights f
+where 
+    f.arrival_airport = 'AAQ' 
+    and f.actual_arrival 
+        between '01-01-2017' and '12-31-2017'
+
+--Ответ: 486
+
+/*
+5.1.2
+Сколько рейсов из Анапы вылетело зимой 2017 года?
+*/
+select
+    count(f.flight_id)
+from 
+    dst_project.flights f
+where 
+    f.arrival_airport = 'AAQ' 
+    and f.actual_arrival 
+        between '01-01-2017' and '03-01-2017'
+
+--Ответ: 127
+
+/*
+5.1.3
+Посчитайте количество отмененных рейсов из Анапы за все время.
+*/
+select
+    count(f.flight_id)
+from 
+    dst_project.flights f
+where 
+    arrival_airport = 'AAQ' 
+    and f.status = 'Cancelled'
+
+--Ответ: 1
+
+/*
+5.1.4
+Сколько рейсов из Анапы не летают в Москву?
+*/
+select
+    count(f.flight_id)
+from 
+    dst_project.flights f
+where 
+    f.arrival_airport = 'AAQ' 
+    and not f.departure_airport = 'DME' and not f.departure_airport = 'SVO' and not f.departure_airport = 'VKO'
+
+--Ответ: 453
+
+/*
+5.1.5
+Какая модель самолета летящего на рейсах из Анапы имеет больше всего мест?
+*/
+select 
+    a.model
+from 
+    (
+    select 
+        a.aircraft_code, b.seats
+        from 
+        (
+        select
+            distinct(f.aircraft_code) aircraft_code
+        from 
+            dst_project.flights f
+        where 
+            arrival_airport = 'AAQ'
+        ) a,
+        (
+         select 
+            s.aircraft_code, count(s.seat_no) seats
+        from
+            dst_project.seats s
+        group by s.aircraft_code
+        )b
+    where 
+        a.aircraft_code = b.aircraft_code
+    ) acs
+    left join 
+        dst_project.aircrafts a on acs.aircraft_code = a.aircraft_code
+    order by 
+		acs.seats desc
+    limit 1
+
+--Ответ: Boeing 737-300

@@ -1,0 +1,102 @@
+with 
+    flight as (
+        select
+            *
+        from
+            dst_project.flights f 
+        left join
+            dst_project.aircrafts a on f.aircraft_code = a.aircraft_code
+    ),
+    
+    ticket as (
+    select
+        tf.flight_id, 
+        sum(tf.amount) sum_amount
+    from
+        dst_project.ticket_flights tf
+    group by
+        tf.flight_id
+    ),
+    
+    ticket_count_by_class as (
+        select
+            tf.flight_id,
+            count(case when tf.fare_conditions = 'Economy' then tf.fare_conditions end) as ticket_economy,
+            count(case when tf.fare_conditions = 'Comfort' then tf.fare_conditions end) as ticket_comfort,
+            count(case when tf.fare_conditions = 'Business' then tf.fare_conditions end) as ticket_business
+        from dst_project.ticket_flights as tf
+        group by tf.flight_id
+    ),
+    
+    aircraft_seats as (
+        select
+            a.model,
+            count(seat_no) all_seats
+        from 
+            dst_project.seats as s
+        left join 
+            dst_project.aircrafts a on s.aircraft_code = a.aircraft_code
+       group by a.model
+    ),
+    /*
+    distanse_between_airports as (
+        select 
+    		'SVO' arrival_airport,
+    		1220 distance
+    	union
+        select 
+    		'NOZ' arrival_airport,
+    		3644  distance
+    	union
+        select 
+    		'EGO' arrival_airport,
+    		630  distance
+    ),*/
+    fuel_consumption as(
+        select 
+    		'Boeing 737-300' model,
+    		2600 fuel_consumption
+    	union
+        select 
+    		'Sukhoi Superjet-100' model,
+    		1510  fuel_consumption
+    )
+    
+select 
+    f.flight_id,
+    f.flight_no,
+    f.scheduled_departure,
+    --f.departure_airport,
+    f.arrival_airport,
+    f.model,
+    tcc.ticket_economy economy,
+    tcc.ticket_comfort comfort,
+    tcc.ticket_business business,
+    aseats.all_seats,
+    (aseats.all_seats - tcc.ticket_economy - tcc.ticket_comfort - tcc.ticket_business)*100. / aseats.all_seats procent_free_seats, 
+    date_part('hour',f.scheduled_arrival - f.scheduled_departure)*60 + date_part('minutes',f.scheduled_arrival - f.scheduled_departure) scheduled_flight_time,
+    date_part('hour',f.scheduled_arrival - f.scheduled_departure)*60 + date_part('minutes',f.scheduled_arrival - f.scheduled_departure) - date_part('hour',f.actual_arrival - f.actual_departure)*60 - date_part('minutes',f.actual_arrival - f.actual_departure) delta_flight_time,
+    t.sum_amount,
+    --dba. distance,
+    --fc.fuel_consumption,
+    --(date_part('hour',f.scheduled_arrival - f.scheduled_departure)*60 + date_part('minutes',f.scheduled_arrival - f.scheduled_departure))/60,
+    --(date_part('hour',f.scheduled_arrival - f.scheduled_departure)*60 + date_part('minutes',f.scheduled_arrival - f.scheduled_departure))/60 * fc.fuel_consumption,
+    (date_part('hour',f.scheduled_arrival - f.scheduled_departure)*60 + date_part('minutes',f.scheduled_arrival - f.scheduled_departure))/60 * fc.fuel_consumption * 40 fuel_cost,
+    t.sum_amount - ((date_part('hour',f.scheduled_arrival - f.scheduled_departure)*60 + date_part('minutes',f.scheduled_arrival - f.scheduled_departure))/60 * fc.fuel_consumption * 40) profit
+from 
+    flight f 
+left join 
+    ticket t on t.flight_id = f.flight_id
+left join
+    ticket_count_by_class tcc on tcc.flight_id = f.flight_id
+left join
+    aircraft_seats aseats on aseats.model = f.model
+/*left join
+    distanse_between_airports dba on dba.arrival_airport = f.arrival_airport*/
+left join
+    fuel_consumption fc on f.model = fc.model
+where 
+    f.departure_airport = 'AAQ'
+    and f.scheduled_departure >= '2016-12-01'
+    and f.scheduled_departure < '2017-03-01'
+    and not f.status = 'Cancelled'
